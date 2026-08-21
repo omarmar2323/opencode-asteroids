@@ -122,6 +122,77 @@ class Asteroid {
   }
 }
 
+// ── ShootingStar ─────────────────────────────────────────────────────────────
+class ShootingStar extends Asteroid {
+  constructor(x, y, size = 1) {
+    super(x, y, size);
+    this.speedMultiplier = 2;
+    this.ttl = 6;
+    this.maxTtl = 6;
+    this.dead = false;
+    this.trail = [];
+
+    const angle = rand(0, Math.PI * 2);
+    const speed = SPEEDS[size] * this.speedMultiplier + rand(-10, 10);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+  }
+
+  update(dt) {
+    this.ttl -= dt;
+    if (this.ttl <= 0) {
+      this.dead = true;
+      return;
+    }
+
+    this.trail.push({ x: this.x, y: this.y, ttl: 0.3 });
+    if (this.trail.length > 12) this.trail.shift();
+    this.trail.forEach(t => t.ttl -= dt);
+    this.trail = this.trail.filter(t => t.ttl > 0);
+
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.rot += this.rotSpeed * dt * 2;
+  }
+
+  draw() {
+    const alpha = Math.min(1, this.ttl / 1.5);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    for (const t of this.trail) {
+      const trailAlpha = (t.ttl / 0.3) * 0.4;
+      ctx.fillStyle = `rgba(255, 220, 50, ${trailAlpha})`;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, this.radius * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 1.8);
+    glow.addColorStop(0, 'rgba(255, 220, 50, 0.4)');
+    glow.addColorStop(1, 'rgba(255, 220, 50, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffdc32';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(this.verts[0][0], this.verts[0][1]);
+    for (let i = 1; i < this.verts.length; i++)
+      ctx.lineTo(this.verts[i][0], this.verts[i][1]);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -309,10 +380,11 @@ class PowerUp {
 }
 
 // ── Estado del juego ──────────────────────────────────────────────────────────
-let ship, bullets, asteroids, particles, powerUps;
+let ship, bullets, asteroids, particles, powerUps, shootingStars;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let shootingStarTimer;
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -326,12 +398,29 @@ function spawnAsteroids(count) {
   }
 }
 
+function spawnShootingStar() {
+  const side = randInt(0, 3);
+  let x, y;
+  const SAFE_DIST = 150;
+  do {
+    switch (side) {
+      case 0: x = rand(0, W); y = -20; break;
+      case 1: x = W + 20; y = rand(0, H); break;
+      case 2: x = rand(0, W); y = H + 20; break;
+      case 3: x = -20; y = rand(0, H); break;
+    }
+  } while (Math.hypot(x - ship.x, y - ship.y) < SAFE_DIST);
+  shootingStars.push(new ShootingStar(x, y, 1));
+}
+
 function initGame() {
   ship          = new Ship();
   bullets   = [];
   asteroids = [];
   particles = [];
   powerUps  = [];
+  shootingStars = [];
+  shootingStarTimer = rand(12, 18);
   score  = 0;
   lives  = 3;
   level  = 1;
@@ -344,6 +433,8 @@ function nextLevel() {
   bullets   = [];
   particles = [];
   powerUps  = [];
+  shootingStars = [];
+  shootingStarTimer = rand(12, 18);
   ship.reset();
   spawnAsteroids(3 + level);
 }
@@ -372,6 +463,8 @@ function update(dt) {
     particles = particles.filter(p => !p.dead);
     powerUps.forEach(p => p.update(dt));
     powerUps = powerUps.filter(p => !p.dead);
+    shootingStars.forEach(s => s.update(dt));
+    shootingStars = shootingStars.filter(s => !s.dead);
     return;
   }
 
@@ -382,6 +475,8 @@ function update(dt) {
     asteroids.forEach(a => a.update(dt));
     powerUps.forEach(p => p.update(dt));
     powerUps = powerUps.filter(p => !p.dead);
+    shootingStars.forEach(s => s.update(dt));
+    shootingStars = shootingStars.filter(s => !s.dead);
     if (deadTimer <= 0) { state = 'playing'; ship.reset(); }
     return;
   }
@@ -391,15 +486,23 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  shootingStarTimer -= dt;
+  if (shootingStarTimer <= 0) {
+    spawnShootingStar();
+    shootingStarTimer = rand(12, 18);
+  }
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
   particles.forEach(p => p.update(dt));
   powerUps.forEach(p => p.update(dt));
+  shootingStars.forEach(s => s.update(dt));
 
-  bullets   = bullets.filter(b => !b.dead);
+  bullets = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
-  powerUps  = powerUps.filter(p => !p.dead);
+  powerUps = powerUps.filter(p => !p.dead);
+  shootingStars = shootingStars.filter(s => !s.dead);
 
   // Bala vs asteroide
   const newAsteroids = [];
@@ -418,14 +521,38 @@ function update(dt) {
       }
     }
   }
+
+  // Bala vs shooting star
+  for (const b of bullets) {
+    for (const s of shootingStars) {
+      if (!s.dead && !b.dead && dist(b, s) < s.radius) {
+        b.dead = true;
+        s.dead = true;
+        score += 200;
+        explode(s.x, s.y, 10);
+      }
+    }
+  }
+
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   powerUps.push(...newPowerUps);
-  bullets   = bullets.filter(b => !b.dead);
+  bullets = bullets.filter(b => !b.dead);
+  shootingStars = shootingStars.filter(s => !s.dead);
 
   // Nave vs asteroide
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+        killShip();
+        break;
+      }
+    }
+  }
+
+  // Nave vs shooting star
+  if (ship.invincible <= 0) {
+    for (const s of shootingStars) {
+      if (!s.dead && dist(ship, s) < ship.radius + s.radius * 0.82) {
         killShip();
         break;
       }
@@ -495,6 +622,7 @@ function draw() {
   ctx.fillRect(0, 0, W, H);
 
   particles.forEach(p => p.draw());
+  shootingStars.forEach(s => s.draw());
   asteroids.forEach(a => a.draw());
   bullets.forEach(b => b.draw());
   powerUps.forEach(p => p.draw());
