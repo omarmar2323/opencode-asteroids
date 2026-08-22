@@ -12,7 +12,7 @@ const justPressed = {};
 window.addEventListener('keydown', e => {
   justPressed[e.code] = !keys[e.code];
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code))
     e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -28,6 +28,53 @@ const wrap  = (v, max) => ((v % max) + max) % max;
 const dist  = (a, b)   => Math.hypot(a.x - b.x, a.y - b.y);
 const rand  = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
+
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKINS = [
+  {
+    name: 'CLÁSICO',
+    vertices: [[20,0],[-12,-9],[-7,0],[-12,9]],
+    color: '#fff',
+    speedColor: '#00ccff',
+    flameColor: 'rgba(255, 130, 0, 0.85)',
+    speedFlameColor: 'rgba(0, 180, 255, 0.85)',
+  },
+  {
+    name: 'NEÓN',
+    vertices: [[22,0],[-5,-11],[-10,0],[-5,11]],
+    color: '#00ffcc',
+    speedColor: '#ff00ff',
+    flameColor: 'rgba(0, 255, 200, 0.85)',
+    speedFlameColor: 'rgba(255, 0, 255, 0.85)',
+  },
+  {
+    name: 'FURIA',
+    vertices: [[24,0],[-14,-12],[-7,-3],[-7,3],[-14,12]],
+    color: '#ff3344',
+    speedColor: '#ffaa00',
+    flameColor: 'rgba(255, 60, 20, 0.85)',
+    speedFlameColor: 'rgba(255, 170, 0, 0.85)',
+  },
+  {
+    name: 'REAL',
+    vertices: [[18,0],[0,-12],[-8,-7],[-8,7],[0,12]],
+    color: '#ffd700',
+    speedColor: '#fff',
+    flameColor: 'rgba(255, 215, 0, 0.85)',
+    speedFlameColor: 'rgba(255, 255, 255, 0.85)',
+  },
+  {
+    name: 'FANTASMA',
+    vertices: [[20,0],[-6,-8],[-12,0],[-6,8]],
+    color: '#88ff88',
+    speedColor: '#00ffff',
+    flameColor: 'rgba(100, 255, 100, 0.85)',
+    speedFlameColor: 'rgba(0, 255, 255, 0.85)',
+  },
+];
+
+let currentSkin = parseInt(localStorage.getItem('asteroidsSkin')) || 0;
+if (currentSkin < 0 || currentSkin >= SKINS.length) currentSkin = 0;
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
@@ -262,18 +309,18 @@ class Ship {
     if (this.dead) return;
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
+    const skin = SKINS[currentSkin];
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = this.speedBoost ? '#00ccff' : '#fff';
+    ctx.strokeStyle = this.speedBoost ? skin.speedColor : skin.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
     ctx.beginPath();
-    ctx.moveTo( 20,  0);
-    ctx.lineTo(-12, -9);
-    ctx.lineTo( -7,  0);
-    ctx.lineTo(-12,  9);
+    ctx.moveTo(skin.vertices[0][0], skin.vertices[0][1]);
+    for (let i = 1; i < skin.vertices.length; i++)
+      ctx.lineTo(skin.vertices[i][0], skin.vertices[i][1]);
     ctx.closePath();
     ctx.stroke();
 
@@ -282,7 +329,7 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = this.speedBoost ? 'rgba(0, 180, 255, 0.85)' : 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = this.speedBoost ? skin.speedFlameColor : skin.flameColor;
       ctx.stroke();
     }
 
@@ -382,7 +429,7 @@ class PowerUp {
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, powerUps, shootingStars;
 let score, lives, level;
-let state;      // 'playing' | 'dead' | 'gameover'
+let state;      // 'title' | 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let shootingStarTimer;
 
@@ -428,6 +475,19 @@ function initGame() {
   spawnAsteroids(4);
 }
 
+function showTitle() {
+  ship = new Ship();
+  ship.x = W / 2;
+  ship.y = H / 2 + 30;
+  ship.angle = -Math.PI / 2;
+  bullets = [];
+  asteroids = [];
+  particles = [];
+  powerUps = [];
+  shootingStars = [];
+  state = 'title';
+}
+
 function nextLevel() {
   level++;
   bullets   = [];
@@ -457,8 +517,21 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
-  if (state === 'gameover') {
+  if (state === 'title') {
+    if (pressed('ArrowLeft')) {
+      currentSkin = (currentSkin - 1 + SKINS.length) % SKINS.length;
+      localStorage.setItem('asteroidsSkin', currentSkin);
+    }
+    if (pressed('ArrowRight')) {
+      currentSkin = (currentSkin + 1) % SKINS.length;
+      localStorage.setItem('asteroidsSkin', currentSkin);
+    }
     if (pressed('Space')) initGame();
+    return;
+  }
+
+  if (state === 'gameover') {
+    if (pressed('Space')) showTitle();
     particles.forEach(p => p.update(dt));
     particles = particles.filter(p => !p.dead);
     powerUps.forEach(p => p.update(dt));
@@ -484,6 +557,12 @@ function update(dt) {
   // Disparar
   if (pressed('Space')) {
     bullets.push(...ship.tryShoot());
+  }
+
+  // Cambiar skin con Tab
+  if (pressed('Tab')) {
+    currentSkin = (currentSkin + 1) % SKINS.length;
+    localStorage.setItem('asteroidsSkin', currentSkin);
   }
 
   shootingStarTimer -= dt;
@@ -576,20 +655,68 @@ function update(dt) {
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawLifeIcon(x, y) {
+  const skin = SKINS[currentSkin];
+  const scale = 0.45;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = skin.color;
   ctx.lineWidth   = 1.2;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
-  ctx.moveTo( 9,  0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-3,  0);
-  ctx.lineTo(-6,  5);
+  ctx.moveTo(skin.vertices[0][0] * scale, skin.vertices[0][1] * scale);
+  for (let i = 1; i < skin.vertices.length; i++)
+    ctx.lineTo(skin.vertices[i][0] * scale, skin.vertices[i][1] * scale);
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
+}
+
+function drawTitle() {
+  const skin = SKINS[currentSkin];
+
+  // Título
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 52px monospace';
+  ctx.fillText('ASTEROIDS', W / 2, H / 2 - 140);
+
+  // Nave central con la skin actual
+  ctx.save();
+  ctx.translate(W / 2, H / 2 + 30);
+  ctx.rotate(-Math.PI / 2);
+  ctx.strokeStyle = skin.color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(skin.vertices[0][0], skin.vertices[0][1]);
+  for (let i = 1; i < skin.vertices.length; i++)
+    ctx.lineTo(skin.vertices[i][0], skin.vertices[i][1]);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Llama trasera
+  ctx.beginPath();
+  ctx.moveTo(-8, -4);
+  ctx.lineTo(-16, 0);
+  ctx.lineTo(-8, 4);
+  ctx.strokeStyle = skin.flameColor;
+  ctx.stroke();
+  ctx.restore();
+
+  // Nombre de la skin con flechas
+  ctx.font = '18px monospace';
+  ctx.fillStyle = skin.color;
+  ctx.fillText(`<  ${skin.name}  >`, W / 2, H / 2 + 100);
+
+  ctx.font = '13px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('← → CAMBIAR SKIN', W / 2, H / 2 + 125);
+
+  // Instrucción
+  ctx.font = '16px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText('ESPACIO PARA JUGAR', W / 2, H / 2 + 180);
 }
 
 function drawHUD() {
@@ -621,6 +748,11 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
 
+  if (state === 'title') {
+    drawTitle();
+    return;
+  }
+
   particles.forEach(p => p.draw());
   shootingStars.forEach(s => s.draw());
   asteroids.forEach(a => a.draw());
@@ -645,5 +777,5 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-initGame();
+showTitle();
 requestAnimationFrame(loop);
