@@ -19,4 +19,15 @@ git worktree add .worktrees/<nombre-del-worktree>
   git worktree add .worktrees/skins  
 - **escudo**: 
   git worktree add .worktrees/shield  
-             
+
+# Listar worktrees
+ git worktree list
+
+## remocion de los tres worktrees
+
+- **triple shot**: 
+  git worktree remove .worktrees/tripleshot
+- **sistema de skins**: 
+  git worktree remove .worktrees/skins  
+- **escudo**: 
+  git worktree remove .worktrees/shield  
