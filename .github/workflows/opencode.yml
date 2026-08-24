@@ -30,4 +30,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/big-pickle
-          token: ${{ secrets.GITHUB_TOKEN }}
+          use_github_token: true
