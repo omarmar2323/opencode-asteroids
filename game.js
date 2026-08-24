@@ -71,10 +71,22 @@ const SKINS = [
     flameColor: 'rgba(100, 255, 100, 0.85)',
     speedFlameColor: 'rgba(0, 255, 255, 0.85)',
   },
+  {
+    name: 'GIGANTE',
+    vertices: [[40,0],[-24,-18],[-14,0],[-24,18]],
+    color: '#9b59b6',
+    speedColor: '#e056fd',
+    flameColor: 'rgba(155, 89, 182, 0.85)',
+    speedFlameColor: 'rgba(224, 86, 253, 0.85)',
+  },
 ];
 
 let currentSkin = parseInt(localStorage.getItem('asteroidsSkin')) || 0;
 if (currentSkin < 0 || currentSkin >= SKINS.length) currentSkin = 0;
+
+function getPointMultiplier() {
+  return currentSkin === 5 ? 3 : 1;
+}
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
@@ -771,7 +783,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
+        score += POINTS[a.size] * getPointMultiplier();
         explode(a.x, a.y, a.size * 5);
         for (const item of a.split()) {
           if (item instanceof ShieldPowerUp) newShieldPowerUps.push(item);
@@ -789,7 +801,7 @@ function update(dt) {
       if (!s.dead && !b.dead && dist(b, s) < s.radius) {
         b.dead = true;
         s.dead = true;
-        score += 200;
+        score += 200 * getPointMultiplier();
         explode(s.x, s.y, 10);
       }
     }
@@ -810,7 +822,7 @@ function update(dt) {
           ship.shieldHits--;
           ship.shieldFlash = 0.2;
           a.dead = true;
-          score += POINTS[a.size];
+          score += POINTS[a.size] * getPointMultiplier();
           explode(a.x, a.y, a.size * 5);
           for (const item of a.split()) {
             if (item instanceof ShieldPowerUp) shieldPowerUps.push(item);
@@ -835,7 +847,7 @@ function update(dt) {
           ship.shieldHits--;
           ship.shieldFlash = 0.2;
           s.dead = true;
-          score += 200;
+          score += 200 * getPointMultiplier();
           explode(s.x, s.y, 10);
           if (ship.shieldHits <= 0) ship.shieldActive = false;
         } else {
