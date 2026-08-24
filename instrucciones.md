@@ -31,3 +31,6 @@ git worktree add .worktrees/<nombre-del-worktree>
   git worktree remove .worktrees/skins  
 - **escudo**: 
   git worktree remove .worktrees/shield  
+
+# creacion de comandos personalizados de opencode
+- https://opencode.ai/docs/commands/
