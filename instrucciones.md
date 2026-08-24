@@ -34,3 +34,6 @@ git worktree add .worktrees/<nombre-del-worktree>
 
 # creacion de comandos personalizados de opencode
 - https://opencode.ai/docs/commands/
+
+# agregar opencode a github 
+- https://opencode.ai/docs/github/
