@@ -22,12 +22,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          persist-credentials: false
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: KEY_FOR_GITHUB
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/big-pickle
+          token: ${{ secrets.GITHUB_TOKEN }}
