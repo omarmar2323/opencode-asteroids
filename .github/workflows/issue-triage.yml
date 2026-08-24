@@ -1,0 +1,137 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "opencode-agent[bot]@users.noreply.github.com"
+          git config --global user.name "opencode-agent[bot]"
+
+      - name: Run OpenCode Triage
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/mimo-v2.5-free
+          use_github_token: true
+          prompt: |
+            Analyze this GitHub issue and add a structured comment.
+
+            DO NOT modify the original issue body or title. Only ADD a new comment.
+
+            Add a comment with this exact format:
+
+            ## Issue Analysis
+
+            **Category:** [bug / feature / enhancement / question / documentation]
+            **Priority:** [low / medium / high]
+            **Affected Area:** [gameplay / UI / performance / skins / audio / other]
+
+            ### Summary
+            [1-2 sentence summary of the issue]
+
+            ### Steps to Reproduce (if applicable)
+            [list steps or "Not provided"]
+
+            ### Expected Behavior
+            [what should happen or "Not specified"]
+
+            ### Suggested Labels
+            [comma-separated list of labels: bug, feature, enhancement, question, documentation, priority: low, priority: medium, priority: high]
+
+            ### Relevant Information
+            [any additional context, related code sections, or potential solutions]
+
+            ---
+            *This analysis was generated automatically by OpenCode.*
+
+      - name: Apply Labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueNumber = issue.number;
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const text = `${title} ${body}`;
+
+            // Detect issue type
+            let labels = [];
+
+            if (text.match(/\b(bug|error|crash|fix|broken|fail|issue|problem|not working|doesn't work|malfunction)\b/)) {
+              labels.push('bug');
+            }
+            if (text.match(/\b(feature|request|add|new|implement|create|would be nice|suggestion)\b/)) {
+              labels.push('feature');
+            }
+            if (text.match(/\b(improve|enhancement|optimize|better|update|refactor|upgrade)\b/)) {
+              labels.push('enhancement');
+            }
+            if (text.match(/\b(question|help|how|why|what|can I|is it possible)\b/)) {
+              labels.push('question');
+            }
+            if (text.match(/\b(doc|docs|documentation|readme|typo|grammar|spelling)\b/)) {
+              labels.push('documentation');
+            }
+
+            // Detect priority
+            if (text.match(/\b(critical|urgent|blocker|showstopper|severe|major)\b/)) {
+              labels.push('priority: high');
+            } else if (text.match(/\b(minor|low|cosmetic|trivial|nice to have)\b/)) {
+              labels.push('priority: low');
+            } else if (labels.includes('bug') || labels.includes('feature')) {
+              labels.push('priority: medium');
+            }
+
+            // Detect affected area
+            if (text.match(/\b(ship|nave|movement|control|input|keyboard|mouse)\b/)) {
+              labels.push('area: gameplay');
+            }
+            if (text.match(/\b(ui|hud|menu|score|lives|display|text|font|button)\b/)) {
+              labels.push('area: UI');
+            }
+            if (text.match(/\b(performance|slow|lag|fps|memory|speed|fast)\b/)) {
+              labels.push('area: performance');
+            }
+            if (text.match(/\b(skin| skins|visual|color|colour|appearance|draw|render)\b/)) {
+              labels.push('area: skins');
+            }
+            if (text.match(/\b(audio|sound|music|sfx|volume|mute)\b/)) {
+              labels.push('area: audio');
+            }
+
+            // Remove duplicates
+            labels = [...new Set(labels)];
+
+            // Apply labels if any detected
+            if (labels.length > 0) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: labels
+                });
+                console.log(`Applied labels: ${labels.join(', ')}`);
+              } catch (error) {
+                console.log(`Error applying labels: ${error.message}`);
+                // Continue even if labels fail - some labels might not exist yet
+              }
+            } else {
+              console.log('No labels detected for this issue');
+            }
